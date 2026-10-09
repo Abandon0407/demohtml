@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>智能仓储温湿度监控系统</title>
+<style>
+:root{
+  --bg:#0d1117;
+  --surface:#161b22;
+  --surface-2:#1c2128;
+  --surface-3:#21262d;
+  --border:#30363d;
+  --border-soft:#242a31;
+  --text:#e6edf3;
+  --text-2:#c9d1d9;
+  --muted:#8b949e;
+  --accent:#58a6ff;
+  --accent-dim:rgba(88,166,255,.14);
+  --ok:#3fb950;
+  --ok-dim:rgba(63,185,80,.14);
+  --warn:#d29922;
+  --warn-dim:rgba(210,153,34,.14);
+  --danger:#f85149;
+  --danger-dim:rgba(248,81,73,.14);
+  --radius:12px;
+  --radius-sm:8px;
+  --shadow:0 8px 24px rgba(0,0,0,.35);
+  --mono:"SFMono-Regular",Consolas,Menlo,monospace;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  line-height:1.6;font-size:14px;-webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(900px 500px at 12% -10%, rgba(88,166,255,.09), transparent 60%),
+    radial-gradient(700px 400px at 92% 0%, rgba(188,140,255,.07), transparent 60%);
+}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em;}
+p{margin:0;}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+input{font-family:inherit;}
+code{font-family:var(--mono);font-size:.86em;color:var(--accent);}
+
+.topbar{
+  position:sticky;top:0;z-index:50;backdrop-filter:blur(12px);
+  background:rgba(13,17,23,.82);border-bottom:1px solid var(--border-soft);
+}
+.topbar-inner{
+  max-width:1160px;margin:0 auto;padding:12px 20px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+}
+.brand{display:flex;align-items:center;gap:12px;min-width:0;}
+.logo{
+  width:38px;height:38px;flex:none;border-radius:10px;display:grid;place-items:center;
+  background:linear-gradient(140deg,#1f6feb,#8957e5);
+  box-shadow:0 0 0 1px rgba(255,255,255,.08),0 4px 14px rgba(31,111,235,.35);
+}
+.logo svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:1.8;}
+.brand h1{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.brand .sub{font-size:11.5px;color:var(--muted);font-family:var(--mono);}
+.topbar-right{display:flex;align-items:center;gap:10px;flex:none;}
+.conn{
+  display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;
+  background:var(--ok-dim);border:1px solid rgba(63,185,80,.28);
+  font-size:12.5px;color:var(--ok);font-weight:500;
+  transition:background .25s,border-color .25s,color .25s;
+}
+.conn.offline{background:var(--danger-dim);border-color:rgba(248,81,73,.28);color:var(--danger);}
+.conn .dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 2s ease-in-out infinite;}
+@keyframes pulse{
+  0%,100%{opacity:1;box-shadow:0 0 0 0 currentColor;}
+  50%{opacity:.55;box-shadow:0 0 0 4px transparent;}
+}
+.ghost-btn{
+  padding:7px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  color:var(--text-2);font-size:12.5px;
+  transition:background .2s,border-color .2s,transform .15s,color .2s;
+}
+.ghost-btn:hover{background:var(--surface-2);border-color:#4a525c;color:var(--text);}
+.ghost-btn:active{transform:scale(.96);}
+.ghost-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+.wrap{max-width:1160px;margin:0 auto;padding:0 20px;position:relative;z-index:1;}
+main{padding:26px 0 70px;}
+section{margin-bottom:30px;animation:fadeUp .5s both;}
+section:nth-child(1){animation-delay:.02s;}
+section:nth-child(2){animation-delay:.08s;}
+section:nth-child(3){animation-delay:.14s;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+
+.sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+.sec-head h2{font-size:16px;}
+.sec-head .hint{font-size:12.5px;color:var(--muted);}
+.sec-head .spacer{flex:1;}
+
+.panel{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  transition:border-color .25s,box-shadow .25s;
+}
+.panel:hover{border-color:#3d444d;box-shadow:var(--shadow);}
+.panel-head{
+  padding:16px 18px;border-bottom:1px solid var(--border-soft);
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+.panel-head h3{font-size:14px;}
+.panel-head .hint{font-size:12px;color:var(--muted);}
+.panel-head .spacer{flex:1;}
+.panel-body{padding:18px;}
+
+.overview{display:grid;grid-template-columns:1fr 1fr 1.25fr;gap:16px;}
+@media(max-width:980px){.overview{grid-template-columns:1fr 1fr;}.device-panel{grid-column:1/-1;}}
+@media(max-width:640px){.overview{grid-template-columns:1fr;}}
+
+.metric-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px;position:relative;overflow:hidden;
+  transition:transform .25s cubic-bezier(.2,.8,.3,1),border-color .25s,box-shadow .25s;
+}
+.metric-card::after{
+  content:"";position:absolute;inset:0;border-radius:var(--radius);pointer-events:none;
+  background:radial-gradient(300px 140px at 50% 0%, var(--tint,transparent), transparent 70%);
+  opacity:.55;transition:opacity .3s;
+}
+.metric-card:hover{transform:translateY(-3px);border-color:#4a525c;box-shadow:var(--shadow);}
+.metric-card:hover::after{opacity:.9;}
+.metric-card[data-level="ok"]{--tint:var(--ok-dim);}
+.metric-card[data-level="warn"]{--tint:var(--warn-dim);}
+.metric-card[data-level="danger"]{--tint:var(--danger-dim);}
+.metric-card[data-level="na"]{--tint:rgba(139,148,158,.08);}
+
+.metric-head{display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1;}
+.metric-label{font-size:13px;color:var(--text-2);font-weight:500;}
+.metric-unit{font-size:11.5px;color:var(--muted);font-family:var(--mono);}
+.metric-body{display:flex;align-items:center;justify-content:center;padding:8px 0 4px;position:relative;}
+.ring{width:132px;height:132px;transform:rotate(-90deg);}
+.ring circle{fill:none;stroke-width:9;stroke-linecap:round;}
+.ring .ring-bg{stroke:var(--surface-3);}
+.ring .ring-fg{
+  stroke:var(--ok);stroke-dasharray:326.73;stroke-dashoffset:326.73;
+  transition:stroke-dashoffset .7s cubic-bezier(.3,.9,.3,1),stroke .35s;
+}
+.metric-card[data-level="warn"] .ring-fg{stroke:var(--warn);}
+.metric-card[data-level="danger"] .ring-fg{stroke:var(--danger);}
+.metric-card[data-level="na"] .ring-fg{stroke:var(--surface-3);}
+.metric-readout{position:absolute;display:flex;align-items:baseline;gap:2px;}
+.metric-value{font-size:36px;font-weight:650;letter-spacing:-.03em;font-variant-numeric:tabular-nums;}
+.metric-suffix{font-size:15px;color:var(--muted);}
+.metric-foot{
+  display:flex;justify-content:space-between;align-items:center;gap:8px;
+  position:relative;z-index:1;margin-top:6px;
+}
+.pill{
+  font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;
+  background:var(--ok-dim);color:var(--ok);transition:background .3s,color .3s;
+}
+.pill.warn{background:var(--warn-dim);color:var(--warn);}
+.pill.danger{background:var(--danger-dim);color:var(--danger);}
+.pill.na{background:var(--surface-3);color:var(--muted);}
+.metric-foot .range{font-size:11.5px;color:var(--muted);font-family:var(--mono);}
+
+.device-panel{display:flex;flex-direction:column;}
+.device-list{display:flex;flex-direction:column;gap:10px;padding:16px 18px;flex:1;}
+.device-item{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 14px;border-radius:var(--radius-sm);
+  background:var(--surface-2);border:1px solid var(--border-soft);
+  transition:border-color .22s,background .22s,transform .22s;
+}
+.device-item:hover{border-color:#4a525c;background:var(--surface-3);transform:translateX(2px);}
+.device-item.on{border-color:rgba(63,185,80,.4);background:linear-gradient(90deg,rgba(63,185,80,.09),var(--surface-2) 60%);}
+.device-info{display:flex;align-items:center;gap:11px;min-width:0;}
+.device-icon{
+  width:34px;height:34px;flex:none;border-radius:9px;display:grid;place-items:center;
+  background:var(--surface-3);font-size:17px;transition:background .25s,transform .3s;
+}
+.device-item.on .device-icon{background:var(--ok-dim);animation:spin 3s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.device-item strong{font-size:13.5px;font-weight:600;display:block;}
+.device-item small{font-size:11px;color:var(--muted);font-family:var(--mono);}
+
+.toggle{
+  width:44px;height:25px;border-radius:999px;flex:none;position:relative;
+  background:var(--surface-3);border:1px solid var(--border);
+  transition:background .28s,border-color .28s;
+}
+.toggle::after{
+  content:"";position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;
+  background:#6e7681;transition:transform .28s cubic-bezier(.3,.9,.3,1),background .28s;
+}
+.toggle.on{background:rgba(63,185,80,.22);border-color:rgba(63,185,80,.5);}
+.toggle.on::after{transform:translateX(19px);background:var(--ok);}
+.toggle:hover{border-color:#5a6169;}
+.toggle:active::after{width:22px;}
+.toggle:disabled{opacity:.4;cursor:not-allowed;}
+
+.mode-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:12px 18px;border-top:1px solid var(--border-soft);background:var(--surface-2);
+  border-radius:0 0 var(--radius) var(--radius);
+}
+.mode-row .label{font-size:12.5px;color:var(--muted);}
+.segmented{display:inline-flex;background:var(--surface-3);border:1px solid var(--border);border-radius:8px;padding:2px;gap:2px;}
+.segmented button{
+  padding:5px 14px;border-radius:6px;font-size:12.5px;color:var(--muted);
+  transition:background .2s,color .2s;
+}
+.segmented button.active{background:var(--accent-dim);color:var(--accent);font-weight:600;}
+.segmented button:hover:not(.active){color:var(--text-2);}
+.segmented button:disabled{opacity:.4;cursor:not-allowed;}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+@media(max-width:760px){.form-grid{grid-template-columns:1fr;}}
+fieldset{border:none;padding:0;margin:0;}
+legend{
+  font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.06em;margin-bottom:12px;padding:0;
+}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.field label{font-size:12.5px;color:var(--text-2);display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.field label .tag{font-size:10.5px;color:var(--muted);font-family:var(--mono);}
+.field input{
+  width:100%;padding:9px 12px;border-radius:var(--radius-sm);
+  background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+  font-size:13.5px;font-variant-numeric:tabular-nums;
+  transition:border-color .2s,box-shadow .2s,background .2s;
+}
+.field input:hover{border-color:#4a525c;}
+.field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim);background:var(--surface);}
+.field input.invalid{border-color:var(--danger);box-shadow:0 0 0 3px var(--danger-dim);}
+.field input:disabled{opacity:.5;cursor:not-allowed;}
+.field .err{font-size:11.5px;color:var(--danger);min-height:16px;opacity:0;transform:translateY(-3px);transition:opacity .2s,transform .2s;}
+.field .err.show{opacity:1;transform:none;}
+
+.form-actions{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding-top:16px;margin-top:4px;border-top:1px solid var(--border-soft);
+}
+.btn{
+  padding:9px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:550;
+  display:inline-flex;align-items:center;gap:7px;
+  transition:transform .15s,background .2s,border-color .2s,opacity .2s;
+}
+.btn:active{transform:scale(.97);}
+.btn-primary{background:#1f6feb;color:#fff;box-shadow:0 2px 10px rgba(31,111,235,.28);}
+.btn-primary:hover{background:#388bfd;}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+.btn-ghost{border:1px solid var(--border);color:var(--text-2);}
+.btn-ghost:hover{background:var(--surface-2);border-color:#4a525c;color:var(--text);}
+.btn-ghost:disabled{opacity:.5;cursor:not-allowed;}
+.note{font-size:12px;color:var(--muted);}
+
+.tabs{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:2px;gap:2px;}
+.tabs button{padding:5px 13px;border-radius:6px;font-size:12.5px;color:var(--muted);transition:background .2s,color .2s;}
+.tabs button.active{background:var(--surface-3);color:var(--text);font-weight:600;}
+.tabs button:hover:not(.active){color:var(--text-2);}
+
+.table-scroll{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{
+  text-align:left;padding:10px 16px;font-size:11.5px;font-weight:600;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.05em;
+  border-bottom:1px solid var(--border);white-space:nowrap;
+}
+tbody td{padding:11px 16px;border-bottom:1px solid var(--border-soft);white-space:nowrap;}
+tbody tr.rec-row{cursor:pointer;transition:background .18s;}
+tbody tr.rec-row:hover,tbody tr.rec-row.open{background:var(--surface-2);}
+tbody tr.rec-row td:first-child{border-left:2px solid transparent;transition:border-color .2s;}
+tbody tr.rec-row:hover td:first-child,tbody tr.rec-row.open td:first-child{border-left-color:var(--accent);}
+
+.badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;font-family:var(--mono);}
+.badge.s{background:var(--accent-dim);color:var(--accent);}
+.badge.e{background:var(--danger-dim);color:var(--danger);}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--text-2);}
+.relay-dots{display:inline-flex;gap:5px;vertical-align:middle;}
+.relay-dot{
+  width:9px;height:9px;border-radius:50%;background:var(--surface-3);
+  border:1px solid var(--border);transition:background .25s,border-color .25s,box-shadow .25s;
+}
+.relay-dot.on{background:var(--ok);border-color:var(--ok);box-shadow:0 0 8px rgba(63,185,80,.55);}
+.chev{width:14px;height:14px;stroke:var(--muted);fill:none;stroke-width:2;transition:transform .28s cubic-bezier(.3,.9,.3,1);}
+tr.rec-row.open .chev{transform:rotate(90deg);}
+
+.detail-row td{padding:0;border-bottom:1px solid var(--border-soft);}
+.collapse{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s cubic-bezier(.3,.9,.3,1);}
+.collapse > .collapse-inner{overflow:hidden;min-height:0;}
+tr.rec-row.open + tr.detail-row .collapse{grid-template-rows:1fr;}
+.detail-content{
+  padding:14px 18px 16px;background:var(--surface-2);
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;
+}
+.detail-item .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.detail-item .v{font-family:var(--mono);font-size:13px;color:var(--text);word-break:break-all;}
+.empty{padding:44px 20px;text-align:center;color:var(--muted);font-size:13px;}
+
+.toast-wrap{position:fixed;right:20px;bottom:20px;z-index:200;display:flex;flex-direction:column;gap:10px;align-items:flex-end;}
+.toast{
+  display:flex;align-items:center;gap:11px;padding:12px 16px;border-radius:10px;
+  background:var(--surface-3);border:1px solid var(--border);
+  box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:13px;
+  min-width:200px;max-width:340px;animation:toastIn .32s cubic-bezier(.2,.9,.3,1) both;
+}
+.toast.out{animation:toastOut .25s ease forwards;}
+@keyframes toastIn{from{opacity:0;transform:translateX(24px) scale(.96);}to{opacity:1;transform:none;}}
+@keyframes toastOut{to{opacity:0;transform:translateX(24px) scale(.96);}}
+.toast .bar{width:3px;align-self:stretch;border-radius:2px;background:var(--accent);flex:none;}
+.toast.ok .bar{background:var(--ok);}
+.toast.warn .bar{background:var(--warn);}
+.toast.err .bar{background:var(--danger);}
+.toast .msg{flex:1;color:var(--text-2);}
+
+::-webkit-scrollbar{width:9px;height:9px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#30363d;border-radius:5px;border:2px solid var(--bg);}
+::-webkit-scrollbar-thumb:hover{background:#4a525c;}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4v10l-9 4-9-4V7z"/><path d="M3 7l9 4 9-4M12 11v10"/></svg>
+      </div>
+      <div>
+        <h1>智能仓储温湿度监控系统</h1>
+        <p class="sub">STM32F103C8T6 · DHT11 · ESP-01S · OneNET</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="ghost-btn" id="btnRefresh">刷新数据</button>
+      <div class="conn" id="connBadge">
+        <span class="dot"></span>
+        <span id="connText">连接中…</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<main>
+
+  <section>
+    <div class="sec-head">
+      <h2>实时概览</h2>
+      <span class="hint" id="refreshHint">数据每 10 秒自动刷新</span>
+    </div>
+
+    <div class="overview">
+      <article class="metric-card" id="cardTemp" data-level="na">
+        <div class="metric-head">
+          <span class="metric-label">温度</span>
+          <span class="metric-unit">°C</span>
+        </div>
+        <div class="metric-body">
+          <svg class="ring" viewBox="0 0 120 120">
+            <circle class="ring-bg" cx="60" cy="60" r="52"></circle>
+            <circle class="ring-fg" id="tempRing" cx="60" cy="60" r="52"></circle>
+          </svg>
+          <div class="metric-readout">
+            <span class="metric-value" id="tempValue">XX</span>
+            <span class="metric-suffix">°C</span>
+          </div>
+        </div>
+        <div class="metric-foot">
+          <span class="pill na" id="tempPill">等待数据</span>
+          <span class="range" id="tempRange">预警 -- ~ --</span>
+        </div>
+      </article>
+
+      <article class="metric-card" id="cardHumi" data-level="na">
+        <div class="metric-head">
+          <span class="metric-label">湿度</span>
+          <span class="metric-unit">%RH</span>
+        </div>
+        <div class="metric-body">
+          <svg class="ring" viewBox="0 0 120 120">
+            <circle class="ring-bg" cx="60" cy="60" r="52"></circle>
+            <circle class="ring-fg" id="humiRing" cx="60" cy="60" r="52"></circle>
+          </svg>
+          <div class="metric-readout">
+            <span class="metric-value" id="humiValue">XX</span>
+            <span class="metric-suffix">%</span>
+          </div>
+        </div>
+        <div class="metric-foot">
+          <span class="pill na" id="humiPill">等待数据</span>
+          <span class="range" id="humiRange">预警 -- ~ --</span>
+        </div>
+      </article>
+
+      <article class="panel device-panel">
+        <div class="panel-head">
+          <h3>设备控制</h3>
+          <span class="spacer"></span>
+          <span class="hint" id="deviceHint">--</span>
+        </div>
+        <div class="device-list">
+          <div class="device-item" id="devK1">
+            <div class="device-info">
+              <div class="device-icon">🌀</div>
+              <div>
+                <strong>通风风扇</strong>
+                <small>PA5 · 继电器 1</small>
+              </div>
+            </div>
+            <button class="toggle" id="tglK1" aria-label="通风风扇开关" aria-pressed="false" disabled></button>
+          </div>
+          <div class="device-item" id="devK2">
+            <div class="device-info">
+              <div class="device-icon">💧</div>
+              <div>
+                <strong>除湿机</strong>
+                <small>PA6 · 继电器 2</small>
+              </div>
+            </div>
+            <button class="toggle" id="tglK2" aria-label="除湿机开关" aria-pressed="false" disabled></button>
+          </div>
+        </div>
+        <div class="mode-row">
+          <span class="label">运行模式</span>
+          <div class="segmented" id="modeSwitch">
+            <button data-mode="auto" disabled>自动</button>
+            <button data-mode="manual" disabled>手动</button>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>阈值配置</h2>
+      <span class="hint">轻度超标仅报警，严重超标才启动设备</span>
+    </div>
+    <div class="panel">
+      <div class="panel-body">
+        <form id="thresholdForm" novalidate>
+          <div class="form-grid">
+            <fieldset>
+              <legend>温度阈值（°C）</legend>
+              <div class="field">
+                <label>轻度超标下限 <span class="tag">temp_min</span></label>
+                <input type="number" name="temp_min" placeholder="XX" step="1" disabled>
+                <span class="err" data-err="temp_min"></span>
+              </div>
+              <div class="field">
+                <label>轻度超标上限 <span class="tag">temp_max</span></label>
+                <input type="number" name="temp_max" placeholder="XX" step="1" disabled>
+                <span class="err" data-err="temp_max"></span>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>湿度阈值（%RH）</legend>
+              <div class="field">
+                <label>轻度超标下限 <span class="tag">humi_min</span></label>
+                <input type="number" name="humi_min" placeholder="XX" step="1" disabled>
+                <span class="err" data-err="humi_min"></span>
+              </div>
+              <div class="field">
+                <label>轻度超标上限 <span class="tag">humi_max</span></label>
+                <input type="number" name="humi_max" placeholder="XX" step="1" disabled>
+                <span class="err" data-err="humi_max"></span>
+              </div>
+            </fieldset>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="btnSaveThreshold" disabled>保存并推送</button>
+            <button type="button" class="btn btn-ghost" id="btnResetThreshold" disabled>清空</button>
+            <span class="note">严重报警阈值：温度 5 / 45 · 湿度 15 / 85 · 回差 2 / 3（固件只读）</span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>运行记录</h2>
+      <span class="hint">点击任意行展开详情</span>
+      <span class="spacer"></span>
+      <div class="tabs" id="recTabs">
+        <button data-filter="all" class="active">全部</button>
+        <button data-filter="S">周期采样</button>
+        <button data-filter="E">告警事件</button>
+      </div>
+      <button class="ghost-btn" id="btnExportCSV" title="导出当前筛选结果为 CSV 文件">
+        <svg style="width:13px;height:13px;vertical-align:-2px;margin-right:5px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        导出 CSV
+      </button>
+    </div>
+    <div class="panel">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px"></th>
+              <th>类型</th>
+              <th>时间</th>
+              <th>温度</th>
+              <th>湿度</th>
+              <th>继电器</th>
+            </tr>
+          </thead>
+          <tbody id="recBody">
+            <tr><td colspan="6"><div class="empty">正在从 OneNET 拉取数据…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+/* ============================================================
+   配置区 —— 部署前请替换为你的实际参数
+   ============================================================ */
+const CONFIG = {
+  // OneNET API 基础地址（旧版 HTTP API，多协议接入）
+  API_BASE: 'https://api.heclouds.com',
+
+  // 你的 OneNET API Key（产品级 Master-APIKey 或设备级 APIKey）
+  API_KEY: 'YOUR_API_KEY',
+
+  // 设备 ID（OneNET 平台分配的数字 ID，不是设备名）
+  DEVICE_ID: 'YOUR_DEVICE_ID',
+
+  // 轮询间隔（毫秒），默认 10 秒
+  POLL_INTERVAL: 10000,
+
+  // 历史记录默认查询条数
+  HISTORY_LIMIT: 100,
+
+  // 历史记录默认查询时间窗口（秒），默认 24 小时
+  HISTORY_WINDOW_S: 86400,
+
+  // 数据流 ID 映射（如果你的设备上传时用了不同的名字，改这里）
+  STREAMS: {
+    temp:     'temp',
+    humi:     'humi',
+    temp_min: 'temp_min',
+    temp_max: 'temp_max',
+    humi_min: 'humi_min',
+    humi_max: 'humi_max',
+    k1:       'k1',
+    k2:       'k2',
+    mode:     'mode'
+  }
+};
+
+/* ============================================================
+   工具函数
+   ============================================================ */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const RING_C = 2 * Math.PI * 52;
+const pad = n => String(n).padStart(2, '0');
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+function fmtDateTime(unix) {
+  const d = new Date(unix * 1000);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+         `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function fmtFileStamp() {
+  const d = new Date();
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_` +
+         `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+function animateNumber(el, from, to, dur = 420) {
+  if (from === to || !Number.isFinite(to)) { el.textContent = to; return; }
+  const t0 = performance.now();
+  (function step(now) {
+    const p = Math.min(1, (now - t0) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(from + (to - from) * eased);
+    if (p < 1) requestAnimationFrame(step);
+  })(t0);
+}
+
+const Toast = (() => {
+  const wrap = $('#toastWrap');
+  return {
+    show(msg, type = 'info', ms = 2600) {
+      const el = document.createElement('div');
+      el.className = `toast ${type}`;
+      el.innerHTML = `<span class="bar"></span><span class="msg"></span>`;
+      el.querySelector('.msg').textContent = msg;
+      wrap.appendChild(el);
+      setTimeout(() => {
+        el.classList.add('out');
+        el.addEventListener('animationend', () => el.remove(), { once: true });
+      }, ms);
+    },
+    ok(m)  { this.show(m, 'ok'); },
+    warn(m){ this.show(m, 'warn'); },
+    err(m) { this.show(m, 'err'); }
+  };
+})();
+
+/* ============================================================
+   状态
+   ============================================================ */
+const State = {
+  telemetry: {
+    temp: null, humi: null,
+    k1: null, k2: null, mode: null,
+    online: false, updatedAt: null
+  },
+  thresholds: { temp_min: null, temp_max: null, humi_min: null, humi_max: null },
+  alarm: { temp_min: 5, temp_max: 45, humi_min: 15, humi_max: 85 },
+  records: [],
+  filter: 'all',
+  loaded: false
+};
+
+/* ============================================================
+   OneNET API 调用层
+   ============================================================ */
+const OneNet = (() => {
+
+  async function request(path, options = {}) {
+    const url = `${CONFIG.API_BASE}${path}`;
+    const headers = {
+      'api-key': CONFIG.API_KEY,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    };
+
+    const res = await fetch(url, { ...options, headers });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+
+    const json = await res.json();
+
+    if (json.errno !== undefined && json.errno !== 0) {
+      throw new Error(`OneNET errno=${json.errno}: ${json.error || '未知错误'}`);
+    }
+
+    return json;
+  }
+
+  /** 查询设备最新数据 */
+  async function fetchLatest() {
+    const s = CONFIG.STREAMS;
+    const streams = [s.temp, s.humi, s.temp_min, s.temp_max, s.humi_min, s.humi_max, s.k1, s.k2, s.mode];
+    const path = `/devices/${CONFIG.DEVICE_ID}/datapoints?datastream_id=${streams.join(',')}`;
+    const json = await request(path);
+
+    const result = {};
+    const data = json.data || {};
+
+    if (Array.isArray(data.datastreams)) {
+      data.datastreams.forEach(ds => {
+        const dp = ds.datapoints && ds.datapoints[0];
+        if (dp) result[ds.id] = { value: dp.value, at: dp.at };
+      });
+    } else if (data.devices && Array.isArray(data.devices)) {
+      const dev = data.devices[0];
+      if (dev && Array.isArray(dev.datastreams)) {
+        dev.datastreams.forEach(ds => {
+          result[ds.id] = { value: ds.value, at: ds.at };
+        });
+      }
+    }
+    return result;
+  }
+
+  /** 查询设备历史数据点 */
+  async function fetchHistory({ start, end, limit } = {}) {
+    const now = Math.floor(Date.now() / 1000);
+    const startTime = start || (now - CONFIG.HISTORY_WINDOW_S);
+    const endTime = end || now;
+    const lim = limit || CONFIG.HISTORY_LIMIT;
+
+    const s = CONFIG.STREAMS;
+    const streams = [s.temp, s.humi, s.k1, s.k2];
+    const params = [
+      `datastream_id=${streams.join(',')}`,
+      `start=${startTime}`,
+      `end=${endTime}`,
+      `limit=${lim}`
+    ].join('&');
+
+    const path = `/devices/${CONFIG.DEVICE_ID}/datapoints?${params}`;
+    const json = await request(path);
+
+    return json.data || {};
+  }
+
+  /** 下发设备命令 */
+  async function sendCommand(body, { qos = 0, timeout = 0 } = {}) {
+    const params = [`device_id=${CONFIG.DEVICE_ID}`];
+    if (qos) params.push(`qos=${qos}`);
+    if (timeout) params.push(`timeout=${timeout}`);
+
+    const path = `/cmds?${params.join('&')}`;
+    const json = await request(path, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+
+    return json.data || {};
+  }
+
+  /** 查询设备信息（在线状态） */
+  async function fetchDeviceInfo() {
+    const json = await request(`/devices/${CONFIG.DEVICE_ID}`);
+    return json.data || {};
+  }
+
+  return { fetchLatest, fetchHistory, sendCommand, fetchDeviceInfo };
+})();
+
+/* ============================================================
+   业务逻辑
+   ============================================================ */
+function levelOf(kind, value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return 'na';
+  const t = State.thresholds, a = State.alarm;
+  const v = Number(value);
+
+  if (kind === 'temp') {
+    if (t.temp_min === null || t.temp_max === null) {
+      if (v < a.temp_min || v > a.temp_max) return 'danger';
+      return 'ok';
+    }
+    if (v < a.temp_min || v > a.temp_max) return 'danger';
+    if (v < t.temp_min || v > t.temp_max) return 'warn';
+    return 'ok';
+  }
+  if (t.humi_min === null || t.humi_max === null) {
+    if (v < a.humi_min || v > a.humi_max) return 'danger';
+    return 'ok';
+  }
+  if (v < a.humi_min || v > a.humi_max) return 'danger';
+  if (v < t.humi_min || v > t.humi_max) return 'warn';
+  return 'ok';
+}
+const LEVEL_TEXT = { ok: '正常', warn: '轻度超标', danger: '严重超标', na: '等待数据' };
+
+function parseNum(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+function parseBool(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'boolean') return v;
+  const s = String(v).toLowerCase();
+  if (s === 'true' || s === '1') return true;
+  if (s === 'false' || s === '0') return false;
+  return null;
+}
+
+/* ============================================================
+   数据拉取
+   ============================================================ */
+async function loadLatest() {
+  try {
+    const raw = await OneNet.fetchLatest();
+    const s = CONFIG.STREAMS;
+
+    if (raw[s.temp])     State.telemetry.temp = parseNum(raw[s.temp].value);
+    if (raw[s.humi])     State.telemetry.humi = parseNum(raw[s.humi].value);
+    if (raw[s.k1])       State.telemetry.k1   = parseBool(raw[s.k1].value);
+    if (raw[s.k2])       State.telemetry.k2   = parseBool(raw[s.k2].value);
+    if (raw[s.mode])     State.telemetry.mode = parseBool(raw[s.mode].value);
+
+    if (raw[s.temp_min]) State.thresholds.temp_min = parseNum(raw[s.temp_min].value);
+    if (raw[s.temp_max]) State.thresholds.temp_max = parseNum(raw[s.temp_max].value);
+    if (raw[s.humi_min]) State.thresholds.humi_min = parseNum(raw[s.humi_min].value);
+    if (raw[s.humi_max]) State.thresholds.humi_max = parseNum(raw[s.humi_max].value);
+
+    const times = [raw[s.temp], raw[s.humi]].filter(Boolean).map(d => new Date(d.at).getTime());
+    State.telemetry.updatedAt = times.length ? Math.max(...times) : Date.now();
+    State.telemetry.online = true;
+    State.loaded = true;
+    return true;
+  } catch (e) {
+    console.error('[OneNET] 拉取最新数据失败:', e);
+    State.telemetry.online = false;
+    return false;
+  }
+}
+
+async function loadHistory() {
+  try {
+    const data = await OneNet.fetchHistory();
+    const s = CONFIG.STREAMS;
+    const records = [];
+
+    const streams = data.datastreams || [];
+    const tempStream = streams.find(x => x.id === s.temp);
+    const humiStream = streams.find(x => x.id === s.humi);
+    const k1Stream   = streams.find(x => x.id === s.k1);
+    const k2Stream   = streams.find(x => x.id === s.k2);
+
+    const allTimes = new Set();
+    [tempStream, humiStream, k1Stream, k2Stream].forEach(st => {
+      if (st && st.datapoints) st.datapoints.forEach(dp => allTimes.add(dp.at));
+    });
+
+    const sortedTimes = Array.from(allTimes).sort();
+
+    sortedTimes.forEach(at => {
+      const t  = tempStream && tempStream.datapoints ? tempStream.datapoints.find(d => d.at === at) : null;
+      const h  = humiStream && humiStream.datapoints ? humiStream.datapoints.find(d => d.at === at) : null;
+      const k1v = k1Stream  && k1Stream.datapoints   ? k1Stream.datapoints.find(d => d.at === at)   : null;
+      const k2v = k2Stream  && k2Stream.datapoints   ? k2Stream.datapoints.find(d => d.at === at)   : null;
+
+      const temp = t ? parseNum(t.value) : null;
+      const humi = h ? parseNum(h.value) : null;
+      const k1 = k1v ? parseBool(k1v.value) : false;
+      const k2 = k2v ? parseBool(k2v.value) : false;
+
+      let type = 'S';
+      const tempDanger = temp !== null && (temp < State.alarm.temp_min || temp > State.alarm.temp_max);
+      const humiDanger = humi !== null && (humi < State.alarm.humi_min || humi > State.alarm.humi_max);
+      if (tempDanger || humiDanger) type = 'E';
+
+      records.push({
+        type,
+        unix: Math.floor(new Date(at).getTime() / 1000),
+        temp, humi,
+        relay: (k1 ? 1 : 0) | (k2 ? 2 : 0),
+        flags: type === 'E' ? 0x12 : 0x00,
+        note: type === 'E' ? '严重超标' : ''
+      });
+    });
+
+    const seen = new Set();
+    State.records = records.filter(r => {
+      if (seen.has(r.unix)) return false;
+      seen.add(r.unix);
+      return true;
+    }).sort((a, b) => a.unix - b.unix);
+
+    if (State.records.length > 500) State.records = State.records.slice(-500);
+  } catch (e) {
+    console.error('[OneNET] 拉取历史数据失败:', e);
+    State.records = [];
+  }
+}
+
+/* ============================================================
+   渲染
+   ============================================================ */
+let lastTemp = null, lastHumi = null;
+
+function renderTelemetry() {
+  const t = State.telemetry;
+
+  const tLevel = levelOf('temp', t.temp);
+  $('#cardTemp').dataset.level = tLevel;
+  if (t.temp !== null) {
+    animateNumber($('#tempValue'), lastTemp ?? t.temp, t.temp);
+    lastTemp = t.temp;
+  } else {
+    $('#tempValue').textContent = 'XX';
+    lastTemp = null;
+  }
+  $('#tempRing').style.strokeDashoffset = t.temp !== null
+    ? RING_C * (1 - clamp(t.temp / 50, 0, 1))
+    : RING_C;
+  const tp = $('#tempPill');
+  tp.textContent = LEVEL_TEXT[tLevel];
+  tp.className = 'pill' + (tLevel === 'ok' ? '' : tLevel === 'na' ? ' na' : ' ' + tLevel);
+
+  const hLevel = levelOf('humi', t.humi);
+  $('#cardHumi').dataset.level = hLevel;
+  if (t.humi !== null) {
+    animateNumber($('#humiValue'), lastHumi ?? t.humi, t.humi);
+    lastHumi = t.humi;
+  } else {
+    $('#humiValue').textContent = 'XX';
+    lastHumi = null;
+  }
+  $('#humiRing').style.strokeDashoffset = t.humi !== null
+    ? RING_C * (1 - clamp(t.humi / 100, 0, 1))
+    : RING_C;
+  const hp = $('#humiPill');
+  hp.textContent = LEVEL_TEXT[hLevel];
+  hp.className = 'pill' + (hLevel === 'ok' ? '' : hLevel === 'na' ? ' na' : ' ' + hLevel);
+
+  $('#tempRange').textContent = State.thresholds.temp_min !== null
+    ? `预警 ${State.thresholds.temp_min} ~ ${State.thresholds.temp_max}`
+    : '预警 -- ~ --';
+  $('#humiRange').textContent = State.thresholds.humi_min !== null
+    ? `预警 ${State.thresholds.humi_min} ~ ${State.thresholds.humi_max}`
+    : '预警 -- ~ --';
+
+  syncDeviceUI();
+  setConnected(t.online);
+  syncFormState();
+}
+
+function syncDeviceUI() {
+  const t = State.telemetry;
+  const hasData = t.k1 !== null;
+
+  const tglK1 = $('#tglK1'), tglK2 = $('#tglK2');
+  tglK1.disabled = !hasData;
+  tglK2.disabled = !hasData;
+
+  if (t.k1 !== null) {
+    tglK1.classList.toggle('on', t.k1);
+    tglK1.setAttribute('aria-pressed', String(t.k1));
+    $('#devK1').classList.toggle('on', t.k1);
+  } else {
+    tglK1.classList.remove('on');
+    $('#devK1').classList.remove('on');
+  }
+
+  if (t.k2 !== null) {
+    tglK2.classList.toggle('on', t.k2);
+    tglK2.setAttribute('aria-pressed', String(t.k2));
+    $('#devK2').classList.toggle('on', t.k2);
+  } else {
+    tglK2.classList.remove('on');
+    $('#devK2').classList.remove('on');
+  }
+
+  $$('#modeSwitch button').forEach(b => {
+    b.disabled = !hasData;
+    if (t.mode !== null) {
+      b.classList.toggle('active', (b.dataset.mode === 'auto') === t.mode);
+    } else {
+      b.classList.remove('active');
+    }
+  });
+
+  $('#deviceHint').textContent = t.mode === null
+    ? '--'
+    : t.mode ? '自动模式 · 超标自动触发' : '手动模式 · 仅响应指令';
+}
+
+function setConnected(online) {
+  const badge = $('#connBadge');
+  badge.classList.toggle('offline', !online);
+  $('#connText').textContent = online ? '云端在线' : '设备离线';
+}
+
+function syncFormState() {
+  const form = $('#thresholdForm');
+  const t = State.thresholds;
+  const enabled = t.temp_min !== null;
+
+  ['temp_min', 'temp_max', 'humi_min', 'humi_max'].forEach(k => {
+    const input = form[k];
+    input.disabled = !enabled;
+    if (enabled && t[k] !== null) input.value = t[k];
+  });
+
+  $('#btnSaveThreshold').disabled = !enabled;
+  $('#btnResetThreshold').disabled = !enabled;
+}
+
+function renderRecords() {
+  const body = $('#recBody');
+  const list = State.filter === 'all'
+    ? State.records
+    : State.records.filter(r => r.type === State.filter);
+
+  if (!State.loaded) {
+    body.innerHTML = `<tr><td colspan="6"><div class="empty">正在从 OneNET 拉取数据…</div></td></tr>`;
+    return;
+  }
+
+  if (!list.length) {
+    body.innerHTML = `<tr><td colspan="6"><div class="empty">暂无记录</div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = list.slice().reverse().map((r, i) => {
+    const relayBits = [];
+    if (r.relay & 1) relayBits.push('通风');
+    if (r.relay & 2) relayBits.push('除湿');
+    const relayText = relayBits.length ? relayBits.join(' + ') : '全关';
+
+    const tempText = r.temp !== null ? `${r.temp} ℃` : 'XX';
+    const humiText = r.humi !== null ? `${r.humi} %` : 'XX';
+
+    return `
+      <tr class="rec-row">
+        <td style="padding-right:0;">
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+        </td>
+        <td><span class="badge ${r.type.toLowerCase()}">${r.type}</span></td>
+        <td class="mono">${fmtDateTime(r.unix)}</td>
+        <td class="mono">${tempText}</td>
+        <td class="mono">${humiText}</td>
+        <td>
+          <span class="relay-dots">
+            <span class="relay-dot ${r.relay & 1 ? 'on' : ''}" title="通风"></span>
+            <span class="relay-dot ${r.relay & 2 ? 'on' : ''}" title="除湿"></span>
+          </span>
+          <span class="mono" style="margin-left:8px;font-size:12px;">${relayText}</span>
+        </td>
+      </tr>
+      <tr class="detail-row">
+        <td colspan="6">
+          <div class="collapse">
+            <div class="collapse-inner">
+              <div class="detail-content">
+                <div class="detail-item"><div class="k">unix 时间戳</div><div class="v">${r.unix}</div></div>
+                <div class="detail-item"><div class="k">relay 位图</div><div class="v">${r.relay} (0b${r.relay.toString(2).padStart(2,'0')})</div></div>
+                <div class="detail-item"><div class="k">flags</div><div class="v">0x${r.flags.toString(16).padStart(2,'0').toUpperCase()}</div></div>
+                <div class="detail-item"><div class="k">类型</div><div class="v">${r.type === 'S' ? '周期采样' : '告警事件'}</div></div>
+                <div class="detail-item" style="grid-column:1/-1;"><div class="k">备注</div><div class="v">${r.note || '—'}</div></div>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+
+  $$('.rec-row', body).forEach(row => {
+    row.addEventListener('click', () => row.classList.toggle('open'));
+  });
+}
+
+/* ============================================================
+   导出 CSV
+   ============================================================ */
+function exportCSV() {
+  const list = State.filter === 'all'
+    ? State.records
+    : State.records.filter(r => r.type === State.filter);
+
+  if (!list.length) {
+    Toast.warn('没有可导出的记录');
+    return;
+  }
+
+  const headers = ['type', 'datetime', 'unix', 'temp', 'humi', 'relay', 'flags'];
+
+  const escapeCSV = val => {
+    const s = String(val ?? '');
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const rows = list.map(r => [
+    r.type,
+    fmtDateTime(r.unix),
+    r.unix,
+    r.temp !== null ? r.temp : 'XX',
+    r.humi !== null ? r.humi : 'XX',
+    r.relay,
+    '0x' + r.flags.toString(16).padStart(2, '0').toUpperCase()
+  ].map(escapeCSV).join(','));
+
+  // 加 BOM（\uFEFF），Excel 打开不会乱码
+  const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `仓储记录_${fmtFileStamp()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  Toast.ok(`已导出 ${list.length} 条记录`);
+}
+
+/* ============================================================
+   事件绑定
+   ============================================================ */
+function bindEvents() {
+
+  $('#tglK1').addEventListener('click', async () => {
+    const target = !State.telemetry.k1;
+    const btn = $('#tglK1');
+    btn.disabled = true;
+    try {
+      await OneNet.sendCommand({ k1: target });
+      State.telemetry.k1 = target;
+      renderTelemetry();
+      Toast.ok(`通风风扇已${target ? '开启' : '关闭'}`);
+      await refreshAll(true);
+    } catch (e) {
+      Toast.err('下发失败：' + e.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $('#tglK2').addEventListener('click', async () => {
+    const target = !State.telemetry.k2;
+    const btn = $('#tglK2');
+    btn.disabled = true;
+    try {
+      await OneNet.sendCommand({ k2: target });
+      State.telemetry.k2 = target;
+      renderTelemetry();
+      Toast.ok(`除湿机已${target ? '开启' : '关闭'}`);
+      await refreshAll(true);
+    } catch (e) {
+      Toast.err('下发失败：' + e.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $$('#modeSwitch button').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const auto = btn.dataset.mode === 'auto';
+      if (auto === State.telemetry.mode) return;
+      $$('#modeSwitch button').forEach(b => b.disabled = true);
+      try {
+        await OneNet.sendCommand({ mode: auto });
+        State.telemetry.mode = auto;
+        renderTelemetry();
+        Toast.ok(`已切换到${auto ? '自动' : '手动'}模式`);
+        await refreshAll(true);
+      } catch (e) {
+        Toast.err('切换失败：' + e.message);
+      } finally {
+        $$('#modeSwitch button').forEach(b => b.disabled = false);
+      }
+    });
+  });
+
+  const form = $('#thresholdForm');
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!validateThresholds()) return;
+
+    const btn = $('#btnSaveThreshold');
+    const raw = Object.fromEntries(new FormData(form).entries());
+
+    btn.disabled = true;
+    btn.textContent = '推送中…';
+
+    try {
+      await OneNet.sendCommand({
+        temp_min: Number(raw.temp_min),
+        temp_max: Number(raw.temp_max),
+        humi_min: Number(raw.humi_min),
+        humi_max: Number(raw.humi_max)
+      });
+
+      State.thresholds = {
+        temp_min: Number(raw.temp_min),
+        temp_max: Number(raw.temp_max),
+        humi_min: Number(raw.humi_min),
+        humi_max: Number(raw.humi_max)
+      };
+      renderTelemetry();
+      Toast.ok('阈值已保存并推送至 OneNET');
+      await refreshAll(true);
+    } catch (e) {
+      Toast.err('推送失败：' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '保存并推送';
+    }
+  });
+
+  $$('#thresholdForm input').forEach(inp => {
+    inp.addEventListener('input', () => validateThresholds(true));
+  });
+
+  $('#btnResetThreshold').addEventListener('click', () => {
+    form.temp_min.value = '';
+    form.temp_max.value = '';
+    form.humi_min.value = '';
+    form.humi_max.value = '';
+    validateThresholds(true);
+    Toast.warn('已清空，请重新输入');
+  });
+
+  $$('#recTabs button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('#recTabs button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      State.filter = btn.dataset.filter;
+      renderRecords();
+    });
+  });
+
+  $('#btnRefresh').addEventListener('click', async () => {
+    const btn = $('#btnRefresh');
+    btn.disabled = true;
+    btn.textContent = '刷新中…';
+    await refreshAll(false);
+    btn.disabled = false;
+    btn.textContent = '刷新数据';
+    if (State.telemetry.online) Toast.ok('数据已更新');
+    else Toast.err('刷新失败，请检查网络或 API 配置');
+  });
+
+  // 导出 CSV
+  $('#btnExportCSV').addEventListener('click', exportCSV);
+}
+
+function validateThresholds(silent = false) {
+  const form = $('#thresholdForm');
+  const v = {
+    temp_min: Number(form.temp_min.value),
+    temp_max: Number(form.temp_max.value),
+    humi_min: Number(form.humi_min.value),
+    humi_max: Number(form.humi_max.value)
+  };
+  const errs = {};
+
+  Object.keys(v).forEach(k => {
+    if (form[k].value !== '' && !Number.isFinite(v[k])) errs[k] = '请输入数字';
+    if (form[k].value === '') errs[k] = '不能为空';
+  });
+
+  if (!errs.temp_min && !errs.temp_max && v.temp_min >= v.temp_max) {
+    errs.temp_min = '下限必须小于上限';
+    errs.temp_max = '上限必须大于下限';
+  }
+  if (!errs.humi_min && !errs.humi_max && v.humi_min >= v.humi_max) {
+    errs.humi_min = '下限必须小于上限';
+    errs.humi_max = '上限必须大于下限';
+  }
+  if (!errs.humi_min && (v.humi_min < 0 || v.humi_min > 100)) errs.humi_min = '范围 0 ~ 100';
+  if (!errs.humi_max && (v.humi_max < 0 || v.humi_max > 100)) errs.humi_max = '范围 0 ~ 100';
+
+  Object.keys(v).forEach(k => {
+    const input = form[k];
+    const errEl = $(`[data-err="${k}"]`);
+    const msg = errs[k];
+    input.classList.toggle('invalid', !!msg);
+    errEl.textContent = msg || '';
+    errEl.classList.toggle('show', !!msg);
+  });
+
+  const valid = Object.keys(errs).length === 0;
+  if (!valid && !silent) Toast.err('请检查表单填写');
+  return valid;
+}
+
+/* ============================================================
+   刷新调度
+   ============================================================ */
+let refreshTimer = null;
+
+async function refreshAll(silent = false) {
+  const ok = await loadLatest();
+  if (ok) {
+    await loadHistory();
+    renderTelemetry();
+    renderRecords();
+  } else {
+    State.telemetry.online = false;
+    renderTelemetry();
+  }
+  if (!silent) return ok;
+}
+
+function startPolling() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => refreshAll(true), CONFIG.POLL_INTERVAL);
+}
+
+/* ============================================================
+   启动
+   ============================================================ */
+(async function init() {
+  bindEvents();
+  renderTelemetry();
+  renderRecords();
+
+  await refreshAll(false);
+  startPolling();
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshAll(true);
+  });
+})();
+</script>
+</body>
+</html>
